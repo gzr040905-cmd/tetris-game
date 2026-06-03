@@ -107,7 +107,7 @@ var dropInt=1000,dropAcc=0;
 var state='menu';// menu|playing|paused|over
 var lockTimer=null,lockRst=0,inLock=false;
 var dasD=0,dasT=0,dasAct=false,arrT=0;
-var shake=null,clearA=null,particles=[],bag=[];
+var shake=null,clearA=null,particles=[],bag=[],nextPreview=null;
 var lastT=0,aniId=null,soundOn=true;
 var audioCtx=null;
 
@@ -153,7 +153,7 @@ function gs(t,r){return P[t].s[r]}
 function vp(sh,px,py){for(var r=0;r<4;r++)for(var c=0;c<4;c++){if(!sh[r][c])continue;var bx=px+c,by=py+r;if(bx<0||bx>=COLS||by>=TOTAL)return false;if(by<0)continue;if(board[by][bx]!==null)return false}return true}
 function grd(){return pShape?!vp(pShape,pX,pY+1):false}
 function nb(){if(bag.length===0){bag=NAMES.slice();for(var i=bag.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=bag[i];bag[i]=bag[j];bag[j]=t}}return bag.pop()}
-function sp(){var t=nb();pType=t;pRot=0;pShape=gs(t,0);pCol={c:P[t].c,l:P[t].l,d:P[t].d};pX=Math.floor((COLS-4)/2);pY=BUF-2;if(!vp(pShape,pX,pY)){pType=null;pShape=null;pCol=null;return false}return true}
+function sp(){var t=nextPreview||nb();nextPreview=nb();pType=t;pRot=0;pShape=gs(t,0);pCol={c:P[t].c,l:P[t].l,d:P[t].d};pX=Math.floor((COLS-4)/2);pY=BUF-2;if(!vp(pShape,pX,pY)){pType=null;pShape=null;pCol=null;return false}return true}
 function mv(dx,dy){if(!pShape)return false;if(vp(pShape,pX+dx,pY+dy)){pX+=dx;pY+=dy;if(dy!==0&&!grd())cancelLock();if(dx!==0&&inLock)onMv();return true}if(dy>0)stLock();return false}
 function rot(dir){if(!pShape||pType==='O')return;var fr=pRot,to=((pRot+dir)%4+4)%4,ns=gs(pType,to),kk=fr+'>'+to,kt=pType==='I'?K2:K1,kicks=kt[kk]||[[0,0]];for(var i=0;i<kicks.length;i++){var dx=kicks[i][0],dy=kicks[i][1];if(vp(ns,pX+dx,pY-dy)){pShape=ns;pRot=to;pX+=dx;pY-=dy;if(inLock)onMv();sfxR();return}}}
 function sd(){if(!pShape||state!=='playing')return;if(mv(0,1)){score+=1;dropAcc=0;sfxSD()}else lock()}
@@ -165,7 +165,7 @@ function lock(){cancelLock();if(!pShape)return;var col=pCol;for(var r=0;r<4;r++)
 function cl(){var full=[];for(var r=0;r<TOTAL;r++){var f=true;for(var c=0;c<COLS;c++)if(board[r][c]===null){f=false;break}if(f)full.push(r)}var n=full.length;if(n===0){combo=-1;upUI();return}clearA={rows:new Set(full),start:performance.now(),dur:400};for(var i=0;i<full.length;i++){var vr=full[i];if(vr>=BUF)for(var c=0;c<COLS;c++)for(var p=0;p<4+Math.floor(Math.random()*5);p++)particles.push(new Pt(vr-BUF,c,board[vr][c]?board[vr][c].c:'#fff'))}var add=(n<=3?[0,100,300,500,800][n]:[0,800,1200,1600][n])*level;combo++;if(combo>0)add+=50*combo*level;score+=add;lines+=n;var nl=Math.floor(lines/10)+1;if(nl>level){level=nl;dropInt=Math.max(60,1000*Math.pow(.92,level-1));sfxLv()}sfxCl(n);upUI()}
 function finCl(){var rows=Array.from(clearA.rows).sort(function(a,b){return b-a});for(var i=0;i<rows.length;i++){board.splice(rows[i],1);board.unshift(new Array(COLS).fill(null))}clearA=null;if(!sp())endGame()}
 function endGame(){state='over';pType=null;pShape=null;pCol=null;sfxEnd();showOV('游戏结束','最终: '+score.toLocaleString()+' 分 | 等级 '+level+' | '+lines+' 行',[{t:'再来一局',c:'prim',a:newGame},{t:'菜单',a:function(){state='menu';showMenu()}}])}
-function newGame(){cancelLock();eb();score=0;level=1;lines=0;combo=-1;dropInt=1000;dropAcc=0;dasD=0;dasT=0;dasAct=false;arrT=0;shake=null;clearA=null;particles=[];bag=[];pType=null;pShape=null;pCol=null;sp();state='playing';hideOV();upUI();lastT=performance.now()}
+function newGame(){cancelLock();eb();score=0;level=1;lines=0;combo=-1;dropInt=1000;dropAcc=0;dasD=0;dasT=0;dasAct=false;arrT=0;shake=null;clearA=null;particles=[];bag=[];nextPreview=null;pType=null;pShape=null;pCol=null;nextPreview=nb();sp();state='playing';hideOV();upUI();lastT=performance.now()}
 
 // 粒子
 function Pt(vr,col,color){this.x=col*CELL+CELL/2;this.y=vr*CELL+CELL/2;this.vx=(Math.random()-.5)*6;this.vy=(Math.random()-.8)*5-2;this.life=1;this.decay=.012+Math.random()*.02;this.size=2+Math.random()*4;this.color=color;this.rot=Math.random()*Math.PI*2;this.rv=(Math.random()-.5)*.3}
@@ -175,7 +175,7 @@ Pt.prototype.draw=function(cx){if(this.life<=0)return;cx.save();cx.globalAlpha=t
 // 渲染
 function dcl(cx,col,row,co,sz,a){if(a===undefined)a=1;var x=col*sz,y=row*sz,bev=Math.max(2,sz*.14),s=sz;cx.globalAlpha=a;cx.fillStyle=co.c;cx.fillRect(x+bev,y+bev,s-bev*2,s-bev*2);cx.fillStyle=co.l;cx.beginPath();cx.moveTo(x,y+bev);cx.lineTo(x+bev,y);cx.lineTo(x+s-bev,y);cx.lineTo(x+s,y+bev);cx.lineTo(x+s-bev,y+bev*2);cx.lineTo(x+bev,y+bev*2);cx.closePath();cx.fill();cx.beginPath();cx.moveTo(x,y+bev);cx.lineTo(x+bev,y+bev*2);cx.lineTo(x+bev,y+s-bev*2);cx.lineTo(x,y+s-bev);cx.closePath();cx.fill();cx.fillStyle=co.d;cx.beginPath();cx.moveTo(x+s,y+bev);cx.lineTo(x+s-bev,y+bev*2);cx.lineTo(x+s-bev,y+s-bev*2);cx.lineTo(x+s,y+s-bev);cx.closePath();cx.fill();cx.beginPath();cx.moveTo(x+bev,y+s-bev*2);cx.lineTo(x+s-bev,y+s-bev*2);cx.lineTo(x+s,y+s-bev);cx.lineTo(x,y+s-bev);cx.closePath();cx.fill();cx.globalAlpha=1}
 function render(ts){var w=COLS*CELL,h=ROWS*CELL;ctx.clearRect(0,0,w,h);var sx=0,sy=0;if(shake){var e=ts-shake.start;if(e>shake.dur)shake=null;else{var dc=1-e/shake.dur,i=shake.i*dc;sx=(Math.random()-.5)*i*2;sy=(Math.random()-.5)*i*2}}ctx.save();ctx.translate(sx,sy);ctx.fillStyle='#0a0a14';ctx.fillRect(0,0,w,h);for(var r=0;r<ROWS;r++)for(var c=0;c<COLS;c++)if((r+c)%2===0){ctx.fillStyle='rgba(255,255,255,.012)';ctx.fillRect(c*CELL,r*CELL,CELL,CELL)}ctx.strokeStyle='rgba(255,255,255,.035)';ctx.lineWidth=.5;for(var rr=0;rr<=ROWS;rr++){ctx.beginPath();ctx.moveTo(0,rr*CELL);ctx.lineTo(w,rr*CELL);ctx.stroke()}for(var cc=0;cc<=COLS;cc++){ctx.beginPath();ctx.moveTo(cc*CELL,0);ctx.lineTo(cc*CELL,h);ctx.stroke()}for(var br=BUF;br<TOTAL;br++)for(var bc=0;bc<COLS;bc++){var cell=board[br][bc];if(!cell)continue;var vr=br-BUF;if(clearA&&clearA.rows.has(br)){var el=ts-clearA.start,pr=Math.min(1,el/clearA.dur);if(pr<.3){var fa=Math.sin(pr/.3*Math.PI*3)*.5+.5;ctx.fillStyle='rgba(255,255,255,'+fa+')';ctx.fillRect(bc*CELL,vr*CELL,CELL,CELL)}else{var sp=(pr-.3)/.7,sc=1-sp,cx2=bc*CELL+CELL/2,cy2=vr*CELL+CELL/2,hl=CELL/2*sc;ctx.save();ctx.globalAlpha=1-sp;ctx.fillStyle='#fff';ctx.fillRect(cx2-hl,cy2-hl,hl*2,hl*2);ctx.restore()}}else dcl(ctx,bc,vr,cell,CELL)}if(pShape&&pCol&&state==='playing'){var gy=pY;while(vp(pShape,pX,gy+1))gy++;if(gy!==pY){ctx.strokeStyle='rgba(255,255,255,.2)';ctx.lineWidth=2;ctx.setLineDash([3,3]);for(var gr=0;gr<4;gr++)for(var gc=0;gc<4;gc++)if(pShape[gr][gc]){var gx=pX+gc,gy2=gy+gr;if(gy2>=BUF)ctx.strokeRect(gx*CELL+2,(gy2-BUF)*CELL+2,CELL-4,CELL-4)}ctx.setLineDash([])}for(var pr=0;pr<4;pr++)for(var pc=0;pc<4;pc++)if(pShape[pr][pc]){var px2=pX+pc,py2=pY+pr;if(py2>=BUF)dcl(ctx,px2,py2-BUF,pCol,CELL)}}ctx.restore();for(var pi=0;pi<particles.length;pi++)particles[pi].draw(ctx);rNext()}
-function rNext(){var c=nextCtx,cw=ncv.width,ch=ncv.height;c.clearRect(0,0,cw,ch);if(!bag.length&&!pType)return;var t=bag.length?bag[bag.length-1]:(pType||NAMES[0]);var sh=gs(t,0),def=P[t],ps=14;var minR=4,maxR=0,minC=4,maxC=0;for(var r=0;r<4;r++)for(var c2=0;c2<4;c2++)if(sh[r][c2]){minR=Math.min(minR,r);maxR=Math.max(maxR,r);minC=Math.min(minC,c2);maxC=Math.max(maxC,c2)}var ox=(cw-(maxC-minC+1)*ps)/2-minC*ps,oy=(ch-(maxR-minR+1)*ps)/2-minR*ps;for(var rr=0;rr<4;rr++)for(var cc=0;cc<4;cc++)if(sh[rr][cc]){var x=ox+cc*ps,y=oy+rr*ps;c.fillStyle=def.c;c.fillRect(x+1,y+1,ps-2,ps-2);c.fillStyle='rgba(255,255,255,.2)';c.fillRect(x+1,y+1,ps-2,ps/2);c.strokeStyle='rgba(255,255,255,.3)';c.lineWidth=1;c.strokeRect(x+1,y+1,ps-2,ps-2)}}
+function rNext(){var c=nextCtx,cw=ncv.width,ch=ncv.height;c.clearRect(0,0,cw,ch);if(!nextPreview)return;var t=nextPreview;var sh=gs(t,0),def=P[t],ps=14;var minR=4,maxR=0,minC=4,maxC=0;for(var r=0;r<4;r++)for(var c2=0;c2<4;c2++)if(sh[r][c2]){minR=Math.min(minR,r);maxR=Math.max(maxR,r);minC=Math.min(minC,c2);maxC=Math.max(maxC,c2)}var ox=(cw-(maxC-minC+1)*ps)/2-minC*ps,oy=(ch-(maxR-minR+1)*ps)/2-minR*ps;for(var rr=0;rr<4;rr++)for(var cc=0;cc<4;cc++)if(sh[rr][cc]){var x=ox+cc*ps,y=oy+rr*ps;c.fillStyle=def.c;c.fillRect(x+1,y+1,ps-2,ps-2);c.fillStyle='rgba(255,255,255,.2)';c.fillRect(x+1,y+1,ps-2,ps/2);c.strokeStyle='rgba(255,255,255,.3)';c.lineWidth=1;c.strokeRect(x+1,y+1,ps-2,ps-2)}}
 function upUI(){elS.textContent=score.toLocaleString();elLv.textContent=level;elLn.textContent=lines}
 
 // 覆盖层
@@ -217,7 +217,7 @@ resize();window.addEventListener('resize',resize);
 
 // 启动
 function init(){
-  eb();sp();upUI();render(0);
+  eb();nextPreview=nb();sp();upUI();render(0);
   showMenu();
   document.addEventListener('click',ensureAudio,{once:true});
   document.addEventListener('touchstart',ensureAudio,{once:true});
