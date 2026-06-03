@@ -298,7 +298,7 @@ html, body {
   var goScore=document.getElementById('goScore'),goDetail=document.getElementById('goDetail');
 
   // ============ 3. 游戏状态 ============
-  var CELL=30, board=[], pType=null, pShape=null, pCol=null, pX=0, pY=0, pRot=0;
+  var CELL=30, board=[], pType=null, pShape=null, pCol=null, pX=0, pY=0, pRot=0, nextType=null;
   var score=0, level=1, lines=0, combo=-1, dropInt=BASE_DROP, dropAcc=0;
   var state='idle'; // idle|playing|paused|gameover
   var lockTimer=null, lockRst=0, inLock=false;
@@ -550,7 +550,8 @@ html, body {
     cancelLock();emptyBoard();score=0;level=1;lines=0;combo=-1;dropInt=BASE_DROP;dropAcc=0;
     dasD=0;dasT=0;dasAct=false;arrT=0;shake=null;clearA=null;particles=[];bag=[];
     pType=null;pShape=null;pCol=null;
-    nextType=nextBag();spawnPiece();if(!nextType)nextType=nextBag();
+    nextType=nextBag();if(!spawnPiece()){emptyBoard();spawnPiece();}
+    if(!nextType)nextType=nextBag();
     state='playing';hideMenu();hideGameOver();lastT=performance.now();
   }
 
@@ -584,13 +585,9 @@ html, body {
 
   // ============ 14. 初始化 ============
   function init(){
-    // 主题
     var saved=localStorage.getItem('tetris-theme');if(saved){theme=saved;if(theme==='light')toggleTheme();}
-    // 音效
     if(localStorage.getItem('tetris-sound')==='0'){soundOn=false;}
-    // 游戏
-    emptyBoard();nextType=nextBag();spawnPiece();if(!nextType)nextType=nextBag();
-    state='idle';render(0);document.getElementById('btnResume').style.display='none';
+    newGame();
     document.addEventListener('click',ensureAudio,{once:true});
     document.addEventListener('touchstart',ensureAudio,{once:true});
     animationId=requestAnimationFrame(loop);
